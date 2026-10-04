@@ -89,9 +89,16 @@ Windows 那种“并发解析同一公共目录会互相报 another Git write op
 
 `GitLogView.rebuildReferenceRows()` 额外算出 `repositoryReferenceRows`（每个仓库的各 kind
 扁平行），面板在可见仓库数 `> 1` 时渲染仓库节点，否则走与以前完全一致的
-Local / Remote / Tags 单仓库布局。选中某个非活动仓库的行时，先 `selectRepository(root)`
-切换活动仓库，再 `selectGitReference(reference)` 加载该分支历史，历史仍是单仓库语义。
+Local / Remote / Tags 单仓库布局。选中某个非活动仓库的行时，用
+`selectRepository(root, reference:)` 一次提交目标仓库和引用。模型在替换活动仓库前
+关闭旧历史游标、取消旧请求、清理旧分支及提交选择，再加载目标引用。
+不能先切仓库再调用 `selectGitReference`：第一次刷新会把旧仓库的分支传给新仓库，
+而第二次异步调用还可能覆盖用户随后选择的仓库。历史仍是单仓库语义。
 只有活动仓库会高亮选中行。
+
+仓库列表消费 Core 的自动发现结果；隐藏目录和构建缓存的排除，以及显式打开根目录、
+工作树容器的例外见
+[仓库发现与切换边界](../bug-fix/2026-10-04-git-repository-discovery-and-selection.md)。
 
 ### 非活动仓库组只读
 

@@ -853,7 +853,7 @@ struct GitLogView: View {
     ) -> some View {
         let collapseKey = "repository:" + repository.repositoryRoot.standardizedFileURL.path
         let isCollapsed = collapsedRepositoryGroups.contains(collapseKey)
-        let actions = repoRowActions(for: repository.repositoryRoot, isActive: isActive)
+        let actions = repoRowActions(for: repository.repositoryRoot)
         // Only the active repository's rows can open the "Tracking Branch"
         // submenu; a read-only row shows no menu, so it gets no remote list.
         let rowRemoteBranches = isActive ? remoteBranches : []
@@ -1006,23 +1006,20 @@ struct GitLogView: View {
         )
     }
 
-    /// Selecting a reference in another repository first switches the active
-    /// repository, then loads that reference's history, so history keeps its
+    /// Selecting a reference in another repository switches the root and
+    /// reference together before loading history, so history keeps its
     /// single-repository semantics. The row is read-only — the write closures
     /// stay populated but unreachable, because `GitReferenceRowView` shows a
     /// non-active repository's rows with `isReadOnly == true` and the menu
     /// builder then returns no entries.
-    private func repoRowActions(
-        for repositoryRoot: URL,
-        isActive: Bool
-    ) -> GitReferenceRowActions {
+    private func repoRowActions(for repositoryRoot: URL) -> GitReferenceRowActions {
         var actions = referenceRowActions
-        guard !isActive else { return actions }
+        // Keep even the currently active row's root: clicking back while a
+        // different repository is loading must supersede that pending selection.
         actions.select = { reference in
             headSelected = false
             Task {
-                await feature.selectRepository(repositoryRoot)
-                await feature.selectGitReference(reference)
+                await feature.selectRepository(repositoryRoot, reference: reference)
             }
         }
         return actions

@@ -297,6 +297,7 @@ package final class GitFeatureModel: ObservableObject {
     private let operationStateProvider: @Sendable (URL) async -> GitOperationState?
     private let worktreesProvider: @Sendable (URL) async -> [GitWorktree]?
     private let repositoryRootsProvider: @Sendable (URL) async -> [URL]
+    private var requestedRepositoryReference: GitReference?
     private var requestedRepositoryRoot: URL?
     private let diffDocumentProvider: @Sendable (GitChange, GitDiffWhitespaceMode) async -> DiffDocument
     let changelistStorage: (any GitChangelistStorage)?
@@ -478,6 +479,7 @@ package final class GitFeatureModel: ObservableObject {
         gitRepositoryRoot = nil
         availableRepositoryRoots = []
         requestedRepositoryRoot = nil
+        requestedRepositoryReference = nil
         currentBranch = "No Git"
         selectedChange = nil
         selectedDiffPatch = ""
@@ -615,6 +617,10 @@ package final class GitFeatureModel: ObservableObject {
             availableRepositoryRoots = repositoryRoots
             didChange = true
         }
+        if let requestedRepositoryRoot, !repositoryRoots.contains(requestedRepositoryRoot) {
+            self.requestedRepositoryRoot = nil
+            requestedRepositoryReference = nil
+        }
         let observation = await workspaceSnapshot(workspaceURL: workspaceURL, repositoryRoots: repositoryRoots)
         if let observation {
             let snapshot = observation.snapshot
@@ -622,7 +628,7 @@ package final class GitFeatureModel: ObservableObject {
             loadChangelistsIfNeeded()
             let changesChanged = gitChanges != snapshot.changes
             if gitRepositoryRoot != snapshot.repositoryRoot {
-                clearGitCommitFilesCache()
+                resetHistoryForRepositoryChange()
                 gitRepositoryRoot = snapshot.repositoryRoot
                 publishGitJournal()
                 gitWorktrees = []
@@ -631,6 +637,13 @@ package final class GitFeatureModel: ObservableObject {
                 gitConsoleRepositoryGeneration &+= 1
                 isLoadingInitialGitConsoleEntry = false
                 hasLoadedInitialGitConsoleEntry = false
+                didChange = true
+            }
+            if requestedRepositoryRoot == snapshot.repositoryRoot,
+               let requestedRepositoryReference {
+                selectedGitReference = requestedRepositoryReference
+                isShowingAllGitReferences = false
+                self.requestedRepositoryReference = nil
                 didChange = true
             }
             if currentBranch != snapshot.branch {
@@ -706,7 +719,7 @@ package final class GitFeatureModel: ObservableObject {
             }
         } else {
             if gitRepositoryRoot != nil {
-                clearGitCommitFilesCache()
+                resetHistoryForRepositoryChange()
                 gitRepositoryRoot = nil
                 didChange = true
             }
@@ -763,11 +776,39 @@ package final class GitFeatureModel: ObservableObject {
         return (snapshot, Set(snapshots.map { $0.repositoryRoot.standardizedFileURL }))
     }
 
-    package func selectRepository(_ root: URL) async {
-        guard availableRepositoryRoots.contains(root), root != (requestedRepositoryRoot ?? gitRepositoryRoot) else { return }
+    package func selectRepository(_ root: URL, reference: GitReference? = nil) async {
+        guard availableRepositoryRoots.contains(root) else { return }
+        if root == gitRepositoryRoot && root == (requestedRepositoryRoot ?? gitRepositoryRoot) {
+            if let reference { await selectGitReference(reference) }
+            return
+        }
         requestedRepositoryRoot = root
+        requestedRepositoryReference = reference
         selectedChange = nil
         await refreshGit()
+    }
+
+    private func resetHistoryForRepositoryChange() {
+        // Close the old repository's cursor before replacing its root. Neither
+        // its selected ref nor a late history/detail result belongs to the new root.
+        cancelGitHistoryLoading()
+        selectedGitReference = nil
+        isShowingAllGitReferences = false
+        gitReferences = []
+        recentGitReferences = []
+        gitCommits = []
+        gitGraphRepositoryCommits = []
+        gitIdentity = nil
+        canLoadMoreGitHistory = false
+        selectedGitCommit = nil
+        selectedGitCommitFile = nil
+        selectedGitCommitDiffContext = nil
+        clearGitCommitFilesCache()
+        historyEditing.reset()
+        closeBranchComparison()
+        gitLogFilterGeneration = UUID()
+        gitLogMatchedCommitHashes = nil
+        isFilteringGitLog = false
     }
 
     package func selectChange(_ change: GitChange) async {

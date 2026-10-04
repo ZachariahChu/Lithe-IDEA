@@ -5,7 +5,9 @@
   "capability": "多仓库引用面板：分组、配色与引用操作",
   "macos": {
     "evidence": [
-      "macos/Sources/Lithe/Views/Git"
+      "macos/Sources/Lithe/Views/Git",
+      "macos/Sources/LitheGitModule/Application/GitFeatureModel.swift",
+      "macos/Tests/LitheGitModuleTests/GitModuleTests.swift"
     ],
     "implementationStatus": "implemented",
     "verificationStatus": "pending"
@@ -18,5 +20,5 @@
     "verificationStatus": "pending"
   },
   "owner": "Git",
-  "verification": "在多仓库工作区打开 Git Log：确认按仓库分组、仓库配色、非活动仓库分组只读，点其它仓库的引用会切换活动仓库且只加载一次，Pull 弹窗可选择远程分支与策略。"
+  "verification": "在多仓库工作区打开 Git Log：确认按仓库分组、仓库配色、非活动仓库分组只读，点其它仓库的引用会切换活动仓库且只加载一次，Pull 弹窗可选择远程分支与策略。 macOS 在两个分支名不同的仓库间切换时不得查询旧分支；目标历史读取失败也不能保留旧仓库的提交、分页或文件详情。"
 }

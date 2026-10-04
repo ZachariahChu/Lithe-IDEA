@@ -589,8 +589,18 @@ working directory at process creation even when filesystem lookup succeeds;
 this is reported as `process_start_failed`, not a missing repository. Shared examples live in `shared/fixtures/git/windows-paths.json`.
 Core treats both
 `.git` directories and `.git` files as repository markers. The default traversal
-visits the entire workspace tree, including build and dependency folders, and
-continues below discovered repositories. Git metadata itself is not traversed.
+skips dot-prefixed descendant directories and the built-in workspace hidden
+directory names (including `.build`, `node_modules`, `target`, `build`,
+`DerivedData`, `dist` and `coverage`). `.worktree` and `.worktrees` remain
+traversable checkout containers; the same exclusions apply inside them.
+Traversal continues below eligible discovered repositories, including ordinary
+`vendor` source checkouts. An explicitly opened root and its containing repository
+are never excluded by their names. These are automatic discovery rules, not Git
+tracking rules: `.gitignore` and file-tree visibility overrides do not configure
+repository ownership. The rules apply before repository status/reference
+aggregation on both hosts. Examples live in
+`shared/fixtures/workspace/repository-visibility-v1.json`.
+Git metadata itself is not traversed.
 Symbolic directory links are not followed, preventing cycles and traversal
 outside the workspace. Callers may explicitly supply `maxDirectories` and
 `maxDepth` to request a bounded scan; product consumers omit these limits.
