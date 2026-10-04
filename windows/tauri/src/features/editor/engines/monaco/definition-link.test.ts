@@ -293,6 +293,40 @@ describe("definition link gesture", () => {
     }
   });
 
+  test("does not reuse locations after context changes without a store notification", async () => {
+    const gesture = createClickableGesture();
+    try {
+      const firstClick = gesture.resolveForClick(position);
+      completeDefinition(targetLocation("Old"));
+      await firstClick;
+      // Capability events and adapter snapshots can change independently of the UI store.
+      navigationContext = "java:ready:changed-capabilities";
+      const newClick = gesture.resolveForClick(position);
+      expect(definitionCalls).toBe(2);
+      completeDefinition(targetLocation("New"));
+      expect((await newClick)?.locations).toEqual(targetLocation("New"));
+    } finally {
+      gesture.dispose();
+      getDefinitionDeferred?.resolve([]);
+    }
+  });
+
+  test("discards in-flight locations after context changes without a store notification", async () => {
+    const gesture = createClickableGesture();
+    try {
+      const oldClick = gesture.resolveForClick(position);
+      navigationContext = "java:ready:changed-capabilities";
+      completeDefinition(targetLocation("Old"));
+      expect(await oldClick).toBeNull();
+      const newClick = gesture.resolveForClick(position);
+      completeDefinition(targetLocation("New"));
+      expect((await newClick)?.locations).toEqual(targetLocation("New"));
+    } finally {
+      gesture.dispose();
+      getDefinitionDeferred?.resolve([]);
+    }
+  });
+
   test("discards in-flight locations when the language service restarts", async () => {
     const gesture = createClickableGesture();
     try {
@@ -309,8 +343,6 @@ describe("definition link gesture", () => {
       getDefinitionDeferred?.resolve([]);
     }
   });
-
-
   test("unrelated language-service changes do not discard the active click", async () => {
     const gesture = createClickableGesture();
     try {

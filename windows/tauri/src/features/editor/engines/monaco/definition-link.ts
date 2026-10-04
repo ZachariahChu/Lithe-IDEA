@@ -38,6 +38,7 @@ interface MonacoDefinitionLinkOptions {
 }
 
 interface DefinitionWordRequest {
+  navigationContext: string;
   modelVersion: number;
   lineNumber: number;
   character: number;
@@ -55,7 +56,7 @@ export interface MonacoDefinitionLinkGesture extends Monaco.IDisposable {
 }
 
 function definitionWordKey(request: DefinitionWordRequest): string {
-  return `${request.modelVersion}:${request.lineNumber}:${request.startColumn}:${request.endColumn}`;
+  return `${request.modelVersion}:${request.lineNumber}:${request.startColumn}:${request.endColumn}:${request.navigationContext}`;
 }
 
 export function registerMonacoDefinitionLinkGesture({
@@ -86,11 +87,16 @@ export function registerMonacoDefinitionLinkGesture({
     });
   }
 
+  const navigationContextKey = () =>
+    LspClient.getInstance().getDocumentNavigationContextKey(documentTarget);
+
   const requestAtPosition = (position: Monaco.Position): DefinitionWordRequest | null => {
     if (!isGestureActive() || model.isDisposed()) return null;
     const word = model.getWordAtPosition(position);
     if (!word) return null;
     return {
+      // Capability changes and adapter snapshots need not notify the UI store.
+      navigationContext: navigationContextKey(),
       modelVersion: model.getVersionId(),
       lineNumber: position.lineNumber,
       character: position.column - 1,
@@ -178,7 +184,7 @@ export function registerMonacoDefinitionLinkGesture({
       }
     },
     onActiveResult: (request, result) => {
-      if (result.locations.length === 0) {
+      if (result.locations.length === 0 || request.navigationContext !== navigationContextKey()) {
         decorations.clear();
         return;
       }
@@ -251,8 +257,6 @@ export function registerMonacoDefinitionLinkGesture({
     syncLinkForModifier(event);
   };
 
-  const navigationContextKey = () =>
-    LspClient.getInstance().getDocumentNavigationContextKey(documentTarget);
   let previousNavigationContext = structurallyCapable ? navigationContextKey() : null;
 
   if (structurallyCapable) {
@@ -322,6 +326,7 @@ export function registerMonacoDefinitionLinkGesture({
         !result ||
         model.isDisposed() ||
         request.modelVersion !== model.getVersionId() ||
+        request.navigationContext !== navigationContextKey() ||
         !isGestureActive()
       ) {
         return null;
