@@ -329,6 +329,11 @@ struct ProjectTreeSelectionTests {
         #expect(selection.paths == ["/workspace/c"])
         selection.selectForDragging(root.path)
         #expect(selection.draggedURLs(excluding: root).isEmpty)
+        // An editor opened outside the workspace can temporarily own the focus;
+        // adding a tree row must not include that external path in file actions.
+        selection.select("/workspace-other/external.txt", visiblePaths: [], extending: false, toggling: true)
+        selection.select("/workspace/c", visiblePaths: [], extending: false, toggling: true)
+        #expect(selection.draggedURLs(excluding: root).map(\.path) == ["/workspace/c"])
     }
 
     @Test

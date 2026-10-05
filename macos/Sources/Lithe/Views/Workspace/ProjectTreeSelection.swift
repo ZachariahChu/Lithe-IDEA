@@ -41,7 +41,8 @@ struct ProjectTreeSelection: Equatable {
     }
 
     func draggedURLs(excluding root: URL) -> [URL] {
-        paths.sorted().filter { $0 != root.path }.compactMap { path in
+        let prefix = root.path == "/" ? "/" : root.path + "/"
+        return paths.sorted().filter { $0 != root.path && $0.hasPrefix(prefix) }.compactMap { path in
             var parent = (path as NSString).deletingLastPathComponent
             while !parent.isEmpty && parent != "/" {
                 if parent != root.path && paths.contains(parent) { return nil }
