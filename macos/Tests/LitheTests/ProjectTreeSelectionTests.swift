@@ -210,7 +210,7 @@ struct ProjectTreeSelectionTests {
 
     @Test
     @MainActor
-    func nativeRowDefersPlainSelectionAndLeavesDisclosureToItsButton() throws {
+    func nativeRowDefersSelectionAndLeavesDisclosureToItsButton() throws {
         let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 240, height: 24),
                               styleMask: [.borderless], backing: .buffered, defer: false)
         window.isReleasedWhenClosed = false
@@ -234,6 +234,18 @@ struct ProjectTreeSelectionTests {
             windowNumber: window.windowNumber, context: nil, eventNumber: 1, clickCount: 1, pressure: 0))
         view.mouseUp(with: up)
         #expect(selection.paths == ["a"])
+
+        view.select = { flags in
+            selection.select("b", visiblePaths: [], extending: flags.contains(.shift), toggling: flags.contains(.command))
+        }
+        let commandDown = try #require(NSEvent.mouseEvent(
+            with: .leftMouseDown, location: NSPoint(x: 80, y: 12), modifierFlags: .command, timestamp: 0,
+            windowNumber: window.windowNumber, context: nil, eventNumber: 1, clickCount: 1, pressure: 1))
+        view.mouseDown(with: commandDown)
+        #expect(selection.paths == ["a"])
+        // Releasing Command before the mouse still toggles the clicked row.
+        view.mouseUp(with: up)
+        #expect(selection.paths == ["a", "b"])
     }
 
     @Test

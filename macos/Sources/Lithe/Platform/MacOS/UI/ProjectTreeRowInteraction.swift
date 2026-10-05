@@ -58,20 +58,21 @@ final class ProjectTreeRowInteractionView: NSView, NSDraggingSource {
 
     override func mouseDown(with event: NSEvent) {
         guard !event.modifierFlags.contains(.control) else { return }
-        if !event.modifierFlags.intersection([.command, .shift]).isEmpty {
-            select?(event.modifierFlags)
-            mouseDownEvent = nil
-        } else {
-            mouseDownEvent = event
-        }
+        mouseDownEvent = event
     }
 
     override func mouseUp(with event: NSEvent) {
-        guard mouseDownEvent != nil else { return }
+        guard let start = mouseDownEvent else { return }
         mouseDownEvent = nil
         guard bounds.contains(convert(event.locationInWindow, from: nil)) else { return }
-        activate?()
-        if event.clickCount == 2 { doubleClick?() }
+        // Use the down-event modifiers even if the key was released first. A
+        // Command-drag must not toggle its starting row out of the selection.
+        if !start.modifierFlags.intersection([.command, .shift]).isEmpty {
+            select?(start.modifierFlags)
+        } else {
+            activate?()
+            if event.clickCount == 2 { doubleClick?() }
+        }
     }
 
     override func mouseDragged(with event: NSEvent) {
