@@ -108,7 +108,7 @@ function activeDebug(configId = "boot") {
 test("selected Run goes through the existing owner, not the focused background output slot", async () => {
   useRunStore.setState({ selectedSessionId: "other" });
   await startSelectedRunConfiguration("run");
-  expect(run).toHaveBeenCalledWith("boot", undefined);
+  expect(run).toHaveBeenCalledWith("boot", undefined, undefined, expect.any(AbortSignal));
   expect(launch).not.toHaveBeenCalled();
 });
 

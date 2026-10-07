@@ -96,7 +96,7 @@ test("recognized Spring Boot appears in the title selector and launches through 
   const button = container.querySelector<HTMLButtonElement>(`button[aria-label="${t("run.run")}"]`);
   expect(button?.disabled).toBe(false);
   await act(async () => button!.click());
-  expect(run).toHaveBeenCalledWith("boot", undefined);
+  expect(run).toHaveBeenCalledWith("boot", undefined, undefined, expect.any(AbortSignal));
   expect(useUIState.getState().bottomPaneActiveTab).toBe("run");
 });
 test("stop owns the selected service, not a different background service", async () => {
@@ -179,6 +179,6 @@ test("a recognized Java debug target enables Debug and a live Run displays indep
   expect(rerun?.disabled).toBe(false);
   expect(container.querySelector(`button[aria-label="${t("run.stop")}"]`)).not.toBeNull();
   await act(async () => rerun!.click());
-  expect(run).toHaveBeenCalledWith("boot", undefined);
+  expect(run).toHaveBeenCalledWith("boot", undefined, undefined, expect.any(AbortSignal));
   expect(stop).not.toHaveBeenCalled();
 });

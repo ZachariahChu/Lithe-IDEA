@@ -161,7 +161,9 @@ export async function startSelectedRunConfiguration(mode: "run" | "debug" = "run
       );
     } else {
       // The existing Run owner reserves a new execution and stops the previous slot before launch.
-      await store.getState().actions.runConfiguration(configuration.id, currentFile);
+      await store
+        .getState()
+        .actions.runConfiguration(configuration.id, currentFile, undefined, controller.signal);
     }
   } catch (error) {
     if (isCurrent()) reportError(workspaceId, error);
