@@ -166,13 +166,17 @@ busy-session rejection or the command/event shape.
 For a new session, the host also preserves the adapter's optional legacy model
 catalog while decoding the ACP response and negotiates only the versioned
 `jetbrains.air.recommendedValue` extension. If the configured current model is
-absent from that catalog and the upstream recommendation is present in both the
-catalog and selector, the host requests that model before publishing
-`sessionCreated`. Only the acknowledged full configuration is exposed. Both
+absent from that catalog, the host prefers an upstream recommendation present in
+both the catalog and selector. Without a usable recommendation it selects the
+first catalog model available in the selector, including grouped options. The
+host requests that model before publishing `sessionCreated`; only the
+acknowledged full configuration is exposed, keeping the official choices visible
+after the adapter removes its synthetic unknown model. Both
 requests share the session creation deadline; rejection, timeout, or an
 unconfirmed selection emits `requestFailed`. Valid configured models, loaded
 history, and global CLI files remain unchanged. Missing or malformed optional
-catalog/recommendation data leaves standard ACP behavior intact. The `upstream`
+catalog data or an empty catalog/selector intersection leaves standard ACP
+behavior intact. The `upstream`
 scenarios in the agent fixture protect this workflow without changing the
 command/event JSON shape.
 
@@ -861,8 +865,21 @@ overflow. See `shared/fixtures/git/execution-events-v1.json`.
 `operationAbort`, `operationSkip`, `createTag`, and `deleteTag`. Optional fields are `paths`, `reference`, `referenceKind`,
 `gitReference`, `revision`, `revisions`, `name`, `message`, `remote`, `destination`, `mode`,
 `includeUntracked`, `checkout`, `amend`, `force`, `pushTags`, `expectedPush`, `autoStash`,
-`worktreeMode`, `noCheckout`, and `expectedState`. The four history actions require the reviewed `expectedState`
+`worktreeMode`, `noCheckout`, `expectedBranch`, and `expectedState`. The four history actions require the reviewed `expectedState`
 described below; earlier unreviewed history-write callers must migrate.
+
+`pull` optionally accepts `expectedBranch` as a complete local `refs/heads/*`
+identity for a background update whose host has already fetched. Core pins that
+branch's fetched upstream commit and integrates it with local `merge --ff-only`,
+`merge --no-edit`, or `rebase`, avoiding a second network wait in `git pull`.
+It verifies symbolic HEAD under the repository writer lease before resolving the
+upstream and again before integration; a different branch or detached HEAD fails
+with `invalid_request` and does not integrate. Explicit source references and
+auto-stash are incompatible with this guarded mode. Other operations reject this field. Omission preserves
+existing clients. Hosts should also recheck the selected worktree after Fetch and
+before invoking the guarded update, reporting `state-changed` if the checkout changed while
+the request was waiting. The lease serializes Lithe writes, not external Git
+clients; the final check reduces the gap and is not an external checkout lock.
 
 The core validates pathspecs, revisions, branch names, references, reset modes,
 stash references, and operation-specific required fields before invoking Git.

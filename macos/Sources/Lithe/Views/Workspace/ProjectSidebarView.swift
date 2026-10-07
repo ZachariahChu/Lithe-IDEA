@@ -9,7 +9,16 @@ enum ProjectFileRowActivation {
         openFile()
     }
 
-    static func performDoubleClick(isExecutableBinary: Bool, runExecutable: () -> Void) {
+    static func performDoubleClick(
+        isDirectory: Bool = false,
+        isExecutableBinary: Bool,
+        toggleDirectory: () -> Void = {},
+        runExecutable: () -> Void
+    ) {
+        if isDirectory {
+            toggleDirectory()
+            return
+        }
         guard isExecutableBinary else { return }
         runExecutable()
     }
@@ -102,6 +111,11 @@ struct ProjectSidebarView: View {
                             },
                             selectAll: {
                                 selection.selectAll(in: root)
+                            },
+                            navigate: { key, extending in
+                                contextMenuPath = nil
+                                selection.navigate(key, in: root, expandedPaths: &expandedDirectoryPaths, extending: extending)
+                                if let path = selection.focusedPath { proxy.scrollTo(path) }
                             }
                         ).frame(maxWidth: .infinity, maxHeight: .infinity))
                         .onChange(of: ProjectTreeSelection.visibleNodes(in: root, expandedPaths: expandedDirectoryPaths).map { $0.url.path }) { paths in
@@ -364,6 +378,12 @@ private final class ProjectTreeActions: @unchecked Sendable {
     nonisolated func runExecutable(_ url: URL) {
         Task { @MainActor in self.model.runExecutable(url) }
     }
+    nonisolated func findInFiles() {
+        Task { @MainActor in self.model.openProjectSearch() }
+    }
+    nonisolated func replaceInFiles() {
+        Task { @MainActor in self.model.openProjectReplace() }
+    }
     nonisolated func requestCreateFile(_ url: URL) {
         Task { @MainActor in self.model.requestCreateFile(in: url) }
     }
@@ -559,10 +579,12 @@ private struct FileNodeRow: View {
             },
             activate: { activateRow() },
             doubleClick: {
-                if !node.isDirectory {
-                    ProjectFileRowActivation.performDoubleClick(isExecutableBinary: isExecutableFile) {
-                        actions.runExecutable(node.url)
-                    }
+                ProjectFileRowActivation.performDoubleClick(
+                    isDirectory: node.isDirectory,
+                    isExecutableBinary: isExecutableFile,
+                    toggleDirectory: { toggleExpanded() }
+                ) {
+                    actions.runExecutable(node.url)
                 }
             },
             dragURLs: {
@@ -698,7 +720,7 @@ private struct FileNodeRow: View {
 
     private var batchMenuItems: [LitheContextMenuItem] {
         let urls = selectedItemURLs
-        return clipboardMenuItems + [
+        return clipboardMenuItems + [.separator] + projectSearchMenuItems + [
             .separator,
             .action("Duplicate", isEnabled: !urls.isEmpty) { actions.duplicateFiles(urls) },
             .action("Move to Trash", systemImage: "trash", role: .destructive, isEnabled: !urls.isEmpty) {
@@ -718,8 +740,15 @@ private struct FileNodeRow: View {
         ]
     }
 
+    private var projectSearchMenuItems: [LitheContextMenuItem] {
+        [
+            .action("Find in Files…") { actions.findInFiles() },
+            .action("Replace in Files…") { actions.replaceInFiles() }
+        ]
+    }
+
     private var directoryContextMenuItems: [LitheContextMenuItem] {
-        var items: [LitheContextMenuItem] = []
+        var items = projectSearchMenuItems + [.separator]
 
         items += [
             .submenu("New", items: [
@@ -853,7 +882,7 @@ private struct FileNodeRow: View {
             .action("Open") {
                 actions.openFile(node.url)
             }
-        ]
+        ] + [.separator] + projectSearchMenuItems
 
         if let change = gitStatus.change(for: node.url) {
             items += [
