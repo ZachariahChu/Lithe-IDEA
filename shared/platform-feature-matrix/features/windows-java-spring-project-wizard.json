@@ -19,9 +19,11 @@
       "windows/tauri/src/features/window/lib/new-project-location.test.ts",
       "windows/tauri/src/features/window/lib/spring-initializr.ts",
       "windows/tauri/src/features/window/lib/spring-initializr.test.ts",
-      "windows/tauri/src-tauri/src/project_scaffold.rs"
+      "windows/tauri/src-tauri/src/project_scaffold.rs",
+      "windows/tauri/src/features/window/components/new-project-creation.test.tsx",
+      ".github/workflows/ci-windows.yml"
     ]
   },
-  "verification": "从新项目向导创建普通Java与Spring Boot项目，验证动态版本/依赖选择、重复点击、用户选定路径、失败重试与同名目标保护；通过构造ZIP验证路径穿越、链接、条目/体积上限和清理。此条目只描述Windows向导；不宣称macOS或全部Gradle运行支持。",
+  "verification": "从新项目向导创建普通Java与Spring Boot项目，验证动态版本/依赖选择、重复点击、用户选定路径、失败重试与同名目标保护；通过构造ZIP验证路径穿越、链接、条目/体积上限和清理。此条目只描述Windows向导；不宣称macOS或全部Gradle运行支持。 审查回归还覆盖关闭后重开、卸载后的成功/失败、工作区往返切换、旧 finally 不释放新请求、存在性检查与打开阶段的迟到回调；原生测试验证普通/扩展路径及大小写同身份、安装目录及子目录拒绝、相似前缀兄弟目录允许、无法确认安装位置时失败关闭。目录符号链接为需要权限的 opt-in 原生测试，普通测试不代替真实 GUI 验收。",
   "notes": "Initializr拥有Spring版本和依赖目录；向导不执行下载的构建脚本。独立项目创建不改写已有父项目构建文件。"
 }

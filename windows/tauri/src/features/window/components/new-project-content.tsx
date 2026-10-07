@@ -1,3 +1,4 @@
+import { workspaceRuntimeRegistry } from "@/features/workspace/runtime/workspace-runtime-registry";
 import { SpringProjectFields } from "./spring-project-fields";
 import type { SpringProjectOptions } from "../lib/spring-initializr";
 import { homeDir } from "@tauri-apps/api/path";
@@ -75,7 +76,7 @@ export default function NewProjectContent({
 }: NewProjectContentProps) {
   const { t } = useTranslation();
   const nameInputRef = useRef<HTMLInputElement>(null);
-  const creatingRef = useRef(false);
+  const creatingRef = useRef<{ opening: boolean } | null>(null);
   const [springOptions, setSpringOptions] = useState<SpringProjectOptions | null>(null);
   const repositoryInputRef = useRef<HTMLInputElement>(null);
   const [step, setStep] = useState<"source" | "details" | "creating">(
@@ -151,17 +152,53 @@ export default function NewProjectContent({
     return t("welcome.newProject");
   };
 
+  const closeCreation = () => {
+    creatingRef.current = null;
+    onClose();
+  };
+  const backFromCreation = () => {
+    creatingRef.current = null;
+    onBack();
+  };
+
+  useEffect(() => {
+    // Generation may finish after closing or switching projects. Its directory
+    // remains user-owned, but the retired request must not change current UI.
+    const retireGeneration = () => {
+      if (creatingRef.current && !creatingRef.current.opening) {
+        creatingRef.current = null;
+        setStep("details");
+        setErrorMessage("");
+      }
+    };
+    const stopRoot = useFileSystemStore.subscribe((next, previous) => {
+      if (next.rootFolderPath !== previous.rootFolderPath) retireGeneration();
+    });
+    let workspaceId = workspaceRuntimeRegistry.getActiveWorkspaceId();
+    const stopWorkspace = workspaceRuntimeRegistry.subscribe(() => {
+      const next = workspaceRuntimeRegistry.getActiveWorkspaceId();
+      if (next !== workspaceId) retireGeneration();
+      workspaceId = next;
+    });
+    return () => {
+      creatingRef.current = null;
+      stopRoot();
+      stopWorkspace();
+    };
+  }, []);
+
   useEffect(() => loadDefaultProjectLocation(homeDir, setLocationPath), []);
 
   useEffect(() => {
     if (step !== "details") return;
-    window.setTimeout(() => {
+    const timer = window.setTimeout(() => {
       if (source === "clone") {
         repositoryInputRef.current?.focus();
       } else {
         nameInputRef.current?.focus();
       }
     }, 0);
+    return () => window.clearTimeout(timer);
   }, [source, step]);
 
   const filteredSourceOptions = useMemo(() => {
@@ -257,13 +294,17 @@ export default function NewProjectContent({
 
   const createProject = async () => {
     if (!canCreate || creatingRef.current) return;
-    creatingRef.current = true;
+    const creation = { opening: false };
+    creatingRef.current = creation;
+    const isCurrent = () => creatingRef.current === creation;
 
     setStep("creating");
     setErrorMessage("");
 
     try {
-      if (await exists(destinationPath)) {
+      const destinationExists = await exists(destinationPath);
+      if (!isCurrent()) return;
+      if (destinationExists) {
         throw new Error(t("newProject.errorDestinationExists", { path: destinationPath }));
       }
 
@@ -285,7 +326,12 @@ export default function NewProjectContent({
         await createNewDirectory(locationPath.trim(), projectName.trim());
       }
 
+      if (!isCurrent()) return;
+      // Opening this project changes the active root by design. Once dispatched,
+      // that operation keeps the existing workspace lifecycle owner.
+      creation.opening = true;
       const opened = await handleOpenFolderByPath(destinationPath);
+      if (!isCurrent()) return;
       if (!opened) {
         throw new Error(t("newProject.errorCreatedButCouldNotOpen"));
       }
@@ -299,22 +345,23 @@ export default function NewProjectContent({
         });
       }
     } catch (error) {
+      if (!isCurrent()) return;
       console.error("Failed to create project:", error);
       setErrorMessage(error instanceof Error ? error.message : String(error));
       setStep("details");
     } finally {
-      creatingRef.current = false;
+      if (isCurrent()) creatingRef.current = null;
     }
   };
 
   if (step === "source") {
     return (
       <>
-        <CommandHeader onClose={onClose}>
+        <CommandHeader onClose={closeCreation}>
           <CommandHeaderAction
             type="button"
             aria-label={t("welcome.backToProjects")}
-            onClick={onBack}
+            onClick={backFromCreation}
           >
             <ArrowLeft />
           </CommandHeaderAction>
@@ -356,7 +403,7 @@ export default function NewProjectContent({
   if (step === "creating") {
     return (
       <>
-        <CommandHeader onClose={onClose}>
+        <CommandHeader onClose={closeCreation}>
           <div className="flex min-w-0 flex-1 items-center gap-2">
             <SourceIcon className="shrink-0 text-primary" />
             <span className="truncate font-sans ui-text-base font-medium text-foreground">
@@ -388,7 +435,7 @@ export default function NewProjectContent({
 
   return (
     <>
-      <CommandHeader onClose={onClose}>
+      <CommandHeader onClose={closeCreation}>
         <CommandHeaderAction
           type="button"
           aria-label={t("newProject.backToStarters")}

@@ -141,23 +141,51 @@ pub async fn spring_initializr_metadata() -> Result<Value, String> {
         .map_err(|error| format!("Invalid Spring Initializr metadata: {error}"))
 }
 
-#[tauri::command]
-pub async fn create_project_scaffold(request: ProjectScaffoldRequest) -> Result<String, String> {
-    validate_request(&request)?;
-    // Check before spending network time; publish checks again to catch races.
-    let parent = fs::canonicalize(&request.parent_path)
-        .map_err(|error| format!("Cannot open parent folder: {error}"))?;
-    if !parent.is_dir() || !Path::new(&request.parent_path).is_absolute() {
+// Compare native directory identities, not ordinary versus extended-length path
+// spellings. Both inputs must resolve; failure is not permission to write.
+fn project_parent_outside_installation(
+    parent_path: &Path,
+    executable: &Path,
+) -> Result<PathBuf, String> {
+    if !parent_path.is_absolute() {
         return Err("Choose an existing absolute parent folder.".into());
     }
-    if let Ok(executable) = std::env::current_exe() {
-        if executable
-            .parent()
-            .is_some_and(|installation| parent.starts_with(installation))
-        {
+    let parent = fs::canonicalize(parent_path)
+        .map_err(|error| format!("Cannot open parent folder: {error}"))?;
+    if !parent.is_dir() {
+        return Err("Choose an existing absolute parent folder.".into());
+    }
+    let executable = fs::canonicalize(executable)
+        .map_err(|error| format!("Cannot resolve the Lithe installation: {error}"))?;
+    let installation = executable
+        .parent()
+        .ok_or("Cannot resolve the Lithe installation directory.")?;
+    let installation = same_file::Handle::from_path(installation)
+        .map_err(|error| format!("Cannot inspect the Lithe installation: {error}"))?;
+    for ancestor in parent.ancestors() {
+        let identity = same_file::Handle::from_path(ancestor)
+            .map_err(|error| format!("Cannot inspect the project parent: {error}"))?;
+        if identity == installation {
             return Err("Create projects outside the Lithe installation directory.".into());
         }
     }
+    Ok(parent)
+}
+
+#[tauri::command]
+pub async fn create_project_scaffold(request: ProjectScaffoldRequest) -> Result<String, String> {
+    let executable = std::env::current_exe()
+        .map_err(|error| format!("Cannot locate the Lithe installation: {error}"))?;
+    create_project_scaffold_for_executable(request, executable).await
+}
+
+async fn create_project_scaffold_for_executable(
+    request: ProjectScaffoldRequest,
+    executable: PathBuf,
+) -> Result<String, String> {
+    validate_request(&request)?;
+    // Validate before network access, and again before creating any staging files.
+    let parent = project_parent_outside_installation(Path::new(&request.parent_path), &executable)?;
     if parent.join(&request.name).exists() {
         return Err("The project destination already exists.".into());
     }
@@ -180,6 +208,7 @@ pub async fn create_project_scaffold(request: ProjectScaffoldRequest) -> Result<
         None
     };
     tauri::async_runtime::spawn_blocking(move || {
+        let parent = project_parent_outside_installation(&parent, &executable)?;
         publish_project(&parent, &request, archive.as_deref())
     })
     .await
@@ -451,6 +480,113 @@ mod tests {
         }
         writer.finish().expect("ZIP finish").into_inner()
     }
+    fn fake_installation(fixture: &Staging) -> PathBuf {
+        let installation = fixture.0.join("Lithe");
+        fs::create_dir_all(installation.join("resources")).unwrap();
+        let executable = installation.join("Lithe.exe");
+        fs::write(&executable, "installation sentinel").unwrap();
+        executable
+    }
+
+    #[test]
+    fn installation_and_descendants_are_rejected_before_scaffold_writes() {
+        let fixture = fixture();
+        let executable = fake_installation(&fixture);
+        for parent in [
+            executable.parent().unwrap().to_path_buf(),
+            executable.parent().unwrap().join("resources"),
+        ] {
+            let mut options = request("java");
+            options.parent_path = parent.to_string_lossy().into_owned();
+            let error = tauri::async_runtime::block_on(create_project_scaffold_for_executable(
+                options,
+                executable.clone(),
+            ))
+            .unwrap_err();
+            assert!(error.contains("outside the Lithe installation"), "{error}");
+            assert!(!parent.join("sample").exists());
+            assert!(!fs::read_dir(&parent).unwrap().any(|entry| entry
+                .unwrap()
+                .file_name()
+                .to_string_lossy()
+                .starts_with(".lithe")));
+        }
+        assert_eq!(
+            fs::read_to_string(executable).unwrap(),
+            "installation sentinel"
+        );
+    }
+
+    #[test]
+    fn similar_prefix_siblings_are_allowed_and_unresolved_installations_fail_closed() {
+        let fixture = fixture();
+        let executable = fake_installation(&fixture);
+        let sibling = fixture.0.join("Lithe-projects");
+        fs::create_dir(&sibling).unwrap();
+        assert_eq!(
+            project_parent_outside_installation(&sibling, &executable).unwrap(),
+            fs::canonicalize(&sibling).unwrap()
+        );
+        assert!(
+            project_parent_outside_installation(&sibling, &fixture.0.join("missing.exe")).is_err()
+        );
+        assert!(project_parent_outside_installation(Path::new("relative"), &executable).is_err());
+        assert_eq!(fs::read_dir(&sibling).unwrap().count(), 0);
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn windows_regular_verbatim_and_case_spellings_share_installation_identity() {
+        let fixture = fixture();
+        let executable = fake_installation(&fixture);
+        let canonical = fs::canonicalize(&executable).unwrap();
+        let regular = canonical
+            .to_string_lossy()
+            .strip_prefix(r"\\?\")
+            .unwrap()
+            .to_owned();
+        for spelling in [
+            &regular,
+            &regular.to_uppercase(),
+            &canonical.to_string_lossy().into_owned(),
+        ] {
+            let installation = Path::new(spelling).parent().unwrap();
+            let parent = installation.join("resources");
+            let error = project_parent_outside_installation(&parent, &executable).unwrap_err();
+            assert!(error.contains("outside the Lithe installation"), "{error}");
+            let error = project_parent_outside_installation(
+                executable.parent().unwrap(),
+                Path::new(spelling),
+            )
+            .unwrap_err();
+            assert!(error.contains("outside the Lithe installation"), "{error}");
+        }
+    }
+
+    #[cfg(windows)]
+    #[test]
+    #[ignore = "requires Windows directory symlink privilege or Developer Mode"]
+    fn windows_linked_parent_and_installation_resolve_to_the_same_identity() {
+        let fixture = fixture();
+        let executable = fake_installation(&fixture);
+        let alias = fixture.0.join("installation-alias");
+        std::os::windows::fs::symlink_dir(executable.parent().unwrap(), &alias)
+            .expect("directory link privilege");
+        let result = project_parent_outside_installation(&alias.join("resources"), &executable);
+        let reverse = project_parent_outside_installation(
+            executable.parent().unwrap(),
+            &alias.join("Lithe.exe"),
+        );
+        // Remove the link explicitly before the fixture's recursive cleanup.
+        fs::remove_dir(&alias).unwrap();
+        assert!(result
+            .unwrap_err()
+            .contains("outside the Lithe installation"));
+        assert!(reverse
+            .unwrap_err()
+            .contains("outside the Lithe installation"));
+    }
+
     #[test]
     fn names_cannot_escape_or_use_windows_devices() {
         for name in [
