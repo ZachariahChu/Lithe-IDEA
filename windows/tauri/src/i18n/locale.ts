@@ -1,3 +1,4 @@
+import { javaEntryChinese, javaEntryEnglish } from "./java-entry-creation";
 import { javaProjectChinese, javaProjectEnglish } from "./java-project-creation";
 import { changelistsChinese, changelistsEnglish } from "./git-changelists";
 import { workspaceCommitChinese, workspaceCommitEnglish } from "./git-workspace-commit";
@@ -8,6 +9,7 @@ export type DisplayLanguage = (typeof DISPLAY_LANGUAGES)[number];
 
 const catalogs = {
   "en-US": {
+    ...javaEntryEnglish,
     ...javaProjectEnglish,
     ...aiCommitEnglish,
     ...workspaceCommitEnglish,
@@ -4589,6 +4591,7 @@ const catalogs = {
     "welcome.backToProjects": "Back to projects",
   },
   "zh-CN": {
+    ...javaEntryChinese,
     ...javaProjectChinese,
     ...aiCommitChinese,
     ...workspaceCommitChinese,
