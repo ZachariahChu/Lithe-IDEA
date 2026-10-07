@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import { useFileSystemStore } from "@/features/file-system/stores/file-system.store";
 
-export type NewEntryKind = "java" | "package";
+export type NewEntryKind = "java" | "package" | "module";
 interface NewEntryRequest {
   kind: NewEntryKind;
   directory: string;

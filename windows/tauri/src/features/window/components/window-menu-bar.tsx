@@ -191,6 +191,15 @@ const WindowMenuBar = ({
               >
                 {t("javaEntry.newPackage")}
               </MenubarItem>
+              <MenubarItem
+                disabled={!canCreateJava}
+                onClick={() => {
+                  openNewEntry("module");
+                  closeMenu();
+                }}
+              >
+                {t("javaModule.newModule")}
+              </MenubarItem>
             </MenubarSubContent>
           </MenubarSub>
           <MenubarItem shortcut="mod+o" onClick={() => handleClickEmit("menu_open_folder")}>

@@ -527,6 +527,14 @@ export function useFileExplorerContextMenu({
             openNewEntry("package", directory, rootFolderPath);
           },
         },
+        {
+          id: "new-module",
+          label: t("javaModule.newModule"),
+          icon: <FolderPlus />,
+          onClick: () => {
+            openNewEntry("module", rootFolderPath ?? directory, rootFolderPath);
+          },
+        },
       );
     }
     if (contextMenu.isDir && onGenerateImage)

@@ -47,3 +47,13 @@ describe("New entry workspace ownership", () => {
     expect(useNewEntryStore.getState().request).toBeNull();
   });
 });
+
+test("module requests retain the selected folder without replacing the primary workspace", () => {
+  expect(openNewEntry("module", "/workspace/child", "/workspace/child")).toBe(true);
+  expect(useNewEntryStore.getState().request).toEqual({
+    kind: "module",
+    directory: "/workspace/child",
+    workspaceRoot: "/workspace",
+    sourceRoot: "/workspace/child",
+  });
+});

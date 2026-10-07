@@ -1,4 +1,5 @@
 import { useFileSystemStore } from "@/features/file-system/stores/file-system.store";
+import { NewModuleDialog } from "@/features/window/components/new-module-dialog";
 import { useNewEntryStore } from "../stores/new-entry.store";
 import { NewJavaEntryDialog } from "./new-java-entry-dialog";
 
@@ -11,6 +12,7 @@ export function NewEntryDialogHost() {
       useNewEntryStore.setState({ request: null });
   };
   const key = `${request.kind}:${request.workspaceRoot}:${request.sourceRoot}:${request.directory}`;
+  if (request.kind === "module") return <NewModuleDialog key={key} {...request} onClose={close} />;
   return (
     <NewJavaEntryDialog
       key={key}
