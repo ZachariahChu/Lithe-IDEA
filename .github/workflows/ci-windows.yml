@@ -257,6 +257,17 @@ jobs:
           node $runner --suite-timeout-ms 60000 --report .artifacts/test-stability/windows-debugger-breakpoint-paths.json -- src/features/debugger/stores/debugger-breakpoints.test.ts
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
+      - name: Test selected Run and Debug toolbar
+        shell: pwsh
+        timeout-minutes: 3
+        run: |
+          $runner = ".agents/skills/write-stable-tests/scripts/run-bun-tests-with-timing.mjs"
+          # Keep action spies and mounted control tests isolated from other suites.
+          node $runner --suite-timeout-ms 60000 --report .artifacts/test-stability/windows-selected-run-actions.json -- src/features/run/actions/selected-run-actions.test.ts
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          node $runner --suite-timeout-ms 60000 --report .artifacts/test-stability/windows-title-run-control.json -- src/features/run/components/title-run-control.test.tsx
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
       - name: Test Java file and package creation
         shell: pwsh
         timeout-minutes: 6
