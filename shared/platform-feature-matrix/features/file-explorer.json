@@ -6,7 +6,11 @@
   "macos": {
     "evidence": [
       "macos/Sources/Lithe/Views/Workspace/ProjectSidebarView.swift",
-      "macos/Sources/Lithe/Models/Workspace"
+      "macos/Sources/Lithe/Models/Workspace",
+      "macos/Sources/Lithe/Theme/LitheIcons.swift",
+      "macos/Resources/IDEAIcons/fileTypes/toml.svg",
+      "macos/Resources/IDEAIcons/fileTypes/toml_dark.svg",
+      "macos/Tests/LitheTests/TomlIconResourceTests.swift"
     ],
     "implementationStatus": "implemented",
     "verificationStatus": "pending"
@@ -20,5 +24,5 @@
     "verificationStatus": "pending"
   },
   "owner": "Workspace",
-  "verification": "浏览目录、展开/折叠、打开资源并在文件变更后刷新树。"
+  "verification": "浏览目录、展开/折叠、打开资源并在文件变更后刷新树。 macOS 文件树、标签页与面包屑共用 TOML 文件图标：亮色使用 IDEA New UI 官方浅底蓝色 T，深色使用深底蓝色 T；检查明暗主题切换后选择对应 SVG，保留原始 16pt 几何与颜色。"
 }
