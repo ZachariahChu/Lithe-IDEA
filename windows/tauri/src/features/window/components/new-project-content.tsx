@@ -4,7 +4,15 @@ import type { SpringProjectOptions } from "../lib/spring-initializr";
 import { homeDir } from "@tauri-apps/api/path";
 import { invoke } from "@/platform/tauri-core";
 import { exists } from "@tauri-apps/plugin-fs";
-import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
+import {
+  useEffect,
+  useImperativeHandle,
+  useMemo,
+  useRef,
+  useState,
+  type KeyboardEvent,
+  type Ref,
+} from "react";
 import { useBufferStore } from "@/features/editor/stores/buffer.store";
 import { createNewDirectory } from "@/features/file-system/controllers/file-operations";
 import { openFolder } from "@/features/file-system/controllers/platform";
@@ -48,7 +56,12 @@ import {
 } from "../lib/new-project-model";
 import { useTranslation } from "@/i18n/locale-provider";
 
+export interface NewProjectContentHandle {
+  cancelPendingCreation: () => void;
+}
+
 interface NewProjectContentProps {
+  ref?: Ref<NewProjectContentHandle>;
   onBack: () => void;
   onClose: () => void;
   initialSource?: NewProjectSource;
@@ -70,6 +83,7 @@ const packageManagerOptions = [
 ];
 
 export default function NewProjectContent({
+  ref,
   onBack,
   onClose,
   initialSource,
@@ -77,6 +91,16 @@ export default function NewProjectContent({
   const { t } = useTranslation();
   const nameInputRef = useRef<HTMLInputElement>(null);
   const creatingRef = useRef<{ opening: boolean } | null>(null);
+  useImperativeHandle(
+    ref,
+    () => ({
+      // The outer dialog must retire the request before hiding or animating out.
+      cancelPendingCreation: () => {
+        creatingRef.current = null;
+      },
+    }),
+    [],
+  );
   const [springOptions, setSpringOptions] = useState<SpringProjectOptions | null>(null);
   const repositoryInputRef = useRef<HTMLInputElement>(null);
   const [step, setStep] = useState<"source" | "details" | "creating">(

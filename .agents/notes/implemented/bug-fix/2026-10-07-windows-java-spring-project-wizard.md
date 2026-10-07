@@ -18,6 +18,8 @@
 
 原生检查把父目录和可执行文件都 canonicalize，再用既有 same-file 的目录句柄身份比较父目录祖先，处理 Windows 普通路径、扩展长度前缀、大小写及目录链接；无法确认安装目录时失败关闭，在网络请求前和暂存发布前分别验证。不是字符串 startsWith，也不修改真实安装目录。
 
+外层关闭补充：ProjectPicker 在调用宿主关闭回调之前，通过组件的取消句柄同步退役当前创建请求，覆盖真实 Command 的 Escape/遮罩及其他统一关闭入口。不修改共享动画，也不依赖150毫秒后卸载清理。回归使用真实 ProjectPicker / Command / Base UI，手动保留宿主可见性确认以确保旧子树仍挂载，然后完成或拒绝生成；不模拟 Command、不用真实时间睡眠。这验证 dismissal-to-unmount 边界，不宣称实机动画验收。
+
 ## 考虑过的备选方案
 
 不使用整个 Windows 路径 lower-case 后的字符串比较替代文件身份；不将测试链接写入真实安装目录；不维护另一份固定Spring版本目录；不调用shell拼接下载命令；不直接解压进已存在的目标。
@@ -49,3 +51,6 @@
 
 - `windows/tauri/src/features/window/components/new-project-creation.test.tsx`
 - `.github/workflows/ci-windows.yml`
+
+- `windows/tauri/src/features/window/components/project-picker.tsx`
+- `windows/tauri/src/features/window/components/project-picker-creation.test.tsx`

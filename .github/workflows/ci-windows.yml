@@ -285,6 +285,8 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           node $runner --suite-timeout-ms 60000 --report .artifacts/test-stability/windows-new-project-creation.json -- src/features/window/components/new-project-creation.test.tsx
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          node $runner --suite-timeout-ms 60000 --report .artifacts/test-stability/windows-project-picker-creation.json -- src/features/window/components/project-picker-creation.test.tsx
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Test workspace open, replace, and close lifecycle
         shell: pwsh
